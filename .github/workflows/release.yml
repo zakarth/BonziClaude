@@ -1,0 +1,93 @@
+name: Release BonziClaude
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            ws: gtk2
+            artifact: BonziClaude-linux-x64
+            binary: BonziClaude
+          - os: windows-latest
+            ws: win32
+            artifact: BonziClaude-windows-x64
+            binary: BonziClaude.exe
+            arch: x86_64
+          - os: windows-latest
+            ws: win32
+            artifact: BonziClaude-windows-x86
+            binary: BonziClaude.exe
+            arch: i386
+          - os: macos-latest
+            ws: cocoa
+            artifact: BonziClaude-macos
+            binary: BonziClaude
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc lazarus
+
+      - name: Install Lazarus (Windows/macOS)
+        if: runner.os != 'Linux'
+        uses: gcarreno/setup-lazarus@v3
+        with:
+          lazarus-version: stable
+          architecture: ${{ matrix.arch || '' }}
+
+      - name: Build
+        run: lazbuild --ws=${{ matrix.ws }} BonziClaude.lpi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package releases
+        run: |
+          cd artifacts
+          # Linux
+          chmod +x BonziClaude-linux-x64/BonziClaude
+          tar czf BonziClaude-linux-x64.tar.gz -C BonziClaude-linux-x64 BonziClaude
+          # Windows x64
+          cd BonziClaude-windows-x64 && zip ../BonziClaude-windows-x64.zip BonziClaude.exe && cd ..
+          # Windows x86
+          cd BonziClaude-windows-x86 && zip ../BonziClaude-windows-x86.zip BonziClaude.exe && cd ..
+          # macOS
+          chmod +x BonziClaude-macos/BonziClaude
+          tar czf BonziClaude-macos.tar.gz -C BonziClaude-macos BonziClaude
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/BonziClaude-linux-x64.tar.gz
+            artifacts/BonziClaude-windows-x64.zip
+            artifacts/BonziClaude-windows-x86.zip
+            artifacts/BonziClaude-macos.tar.gz
