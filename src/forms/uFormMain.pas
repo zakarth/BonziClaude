@@ -37,7 +37,8 @@ type
     FPetFrame: Integer;
     FIsPetting: Boolean;
     FIsReading: Boolean;
-    FChatting: Boolean;  // true while chat input is open
+    FChatting: Boolean;
+    FChatForm: TForm;  // current chat input form (for key handler access)
 
     FChatButton: TButton;
     FPetButton: TButton;
@@ -95,6 +96,7 @@ type
     procedure OnIdleTimer(Sender: TObject);
     procedure OnInitBubble(Sender: TObject);
     procedure OnChatClick(Sender: TObject);
+    procedure OnChatKeyPress(Sender: TObject; var Key: Char);
     procedure OnPetClick(Sender: TObject);
     procedure OnMenuConfig(Sender: TObject);
     procedure OnMenuReadFile(Sender: TObject);
@@ -352,13 +354,13 @@ var
 begin
   BtnW := (Width - MARGIN * 2 - 8) div 2;
 
-  // Chat button — opens input in the bubble
+  // Chat button
   FChatButton := TButton.Create(Self);
   FChatButton.Parent := Self;
-  FChatButton.Caption := 'Chat';
+  FChatButton.Caption := #$F0#$9F#$92#$AC;  // 💬
   FChatButton.Width := BtnW;
   FChatButton.Height := INPUT_H;
-  FChatButton.Font.Size := 9;
+  FChatButton.Font.Size := 12;
   FChatButton.OnClick := @OnChatClick;
   FChatButton.Hint := 'Chat with ' + FConfig.Name;
   FChatButton.ShowHint := True;
@@ -371,7 +373,7 @@ begin
   FPetButton.Caption := #$E2#$99#$A5;  // ♥
   FPetButton.Width := BtnW;
   FPetButton.Height := INPUT_H;
-  FPetButton.Font.Size := 10;
+  FPetButton.Font.Size := 12;
   FPetButton.OnClick := @OnPetClick;
   FPetButton.Hint := 'Pet ' + FConfig.Name;
   FPetButton.ShowHint := True;
@@ -1030,77 +1032,67 @@ end;
 //  User interaction
 // ============================================================
 
+procedure TFormMain.OnChatKeyPress(Sender: TObject; var Key: Char);
+begin
+  if Key = #13 then
+  begin
+    Key := #0;
+    if FChatForm <> nil then FChatForm.ModalResult := mrOK;
+  end;
+  if Key = #27 then
+  begin
+    Key := #0;
+    if FChatForm <> nil then FChatForm.ModalResult := mrCancel;
+  end;
+end;
+
 procedure TFormMain.OnChatClick(Sender: TObject);
 var
-  ChatForm: TForm;
-  Memo: TMemo;
-  BtnSend, BtnCancel: TButton;
-  BtnPanel: TPanel;
+  Edit: TEdit;
   InputText: string;
   Pt: TPoint;
 begin
-  // Create a chat input form positioned where the bubble would be
-  ChatForm := TForm.CreateNew(Self);
+  // Hide the speech bubble while chatting
+  if (FBubbleForm <> nil) and FBubbleForm.Visible then
+    FBubbleForm.Hide;
+
+  FChatForm := TForm.CreateNew(Self);
   try
-    ChatForm.BorderStyle := bsNone;
-    ChatForm.FormStyle := fsStayOnTop;
-    ChatForm.Color := $00101010;
-    ChatForm.Width := Self.Width;
-    ChatForm.Height := 120;
-    ChatForm.DoubleBuffered := True;
+    FChatForm.BorderStyle := bsNone;
+    FChatForm.FormStyle := fsStayOnTop;
+    FChatForm.Color := $00101010;
+    FChatForm.Height := 28;
+    FChatForm.DoubleBuffered := True;
+    FChatForm.Width := Self.Width + 60;
 
-    // Position above the companion (same as bubble)
+    // Position right above the companion
     Pt := ClientToScreen(Point(ClientWidth, 0));
-    ChatForm.Left := Pt.X - ChatForm.Width;
-    ChatForm.Top := Pt.Y - ChatForm.Height;
+    FChatForm.Left := Pt.X - FChatForm.Width;
+    FChatForm.Top := Pt.Y - FChatForm.Height;
 
-    // Text input area
-    Memo := TMemo.Create(ChatForm);
-    Memo.Parent := ChatForm;
-    Memo.Align := alClient;
-    Memo.Font.Name := FBubbleFont.Name;
-    Memo.Font.Size := 10;
-    Memo.Font.Color := FThemeColor;
-    Memo.Color := $00101010;
-    Memo.ScrollBars := ssVertical;
-    Memo.WordWrap := True;
+    // Clean single-line edit — Enter sends, Escape closes
+    Edit := TEdit.Create(FChatForm);
+    Edit.Parent := FChatForm;
+    Edit.Align := alClient;
+    Edit.Font.Name := FBubbleFont.Name;
+    Edit.Font.Size := 11;
+    Edit.Font.Color := FThemeColor;
+    Edit.Color := $00101010;
+    Edit.BorderStyle := bsSingle;
+    Edit.TextHint := 'Enter to send, Esc to close';
+    Edit.OnKeyPress := @OnChatKeyPress;
     {$IFDEF WINDOWS}
-    Memo.Font.Quality := fqClearType;
+    Edit.Font.Quality := fqClearType;
     {$ENDIF}
 
-    // Button panel at bottom
-    BtnPanel := TPanel.Create(ChatForm);
-    BtnPanel.Parent := ChatForm;
-    BtnPanel.Align := alBottom;
-    BtnPanel.Height := 28;
-    BtnPanel.BevelOuter := bvNone;
-    BtnPanel.Color := $00101010;
-
-    BtnSend := TButton.Create(ChatForm);
-    BtnSend.Parent := BtnPanel;
-    BtnSend.Align := alRight;
-    BtnSend.Width := 60;
-    BtnSend.Caption := 'Send';
-    BtnSend.ModalResult := mrOK;
-    BtnSend.Default := True;
-
-    BtnCancel := TButton.Create(ChatForm);
-    BtnCancel.Parent := BtnPanel;
-    BtnCancel.Align := alLeft;
-    BtnCancel.Width := 60;
-    BtnCancel.Caption := 'Close';
-    BtnCancel.ModalResult := mrCancel;
-    BtnCancel.Cancel := True;
-
     FChatting := True;
-    ChatForm.ActiveControl := Memo;
+    FChatForm.ActiveControl := Edit;
 
-    if ChatForm.ShowModal = mrOK then
+    if FChatForm.ShowModal = mrOK then
     begin
-      InputText := Trim(Memo.Text);
+      InputText := Trim(Edit.Text);
       if InputText <> '' then
       begin
-        // Built-in commands
         if (LowerCase(InputText) = 'exit') or (LowerCase(InputText) = 'quit') then
         begin
           SaveState;
@@ -1122,7 +1114,8 @@ begin
     end;
   finally
     FChatting := False;
-    ChatForm.Free;
+    FChatForm.Free;
+    FChatForm := nil;
   end;
 end;
 
