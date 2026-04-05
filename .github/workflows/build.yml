@@ -1,0 +1,86 @@
+name: Build BonziClaude
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc lazarus
+
+      - name: Build Linux x64
+        run: lazbuild --ws=gtk2 BonziClaude.lpi
+
+      - name: Upload Linux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: BonziClaude-linux-x64
+          path: BonziClaude
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus
+        uses: gcarreno/setup-lazarus@v3
+        with:
+          lazarus-version: stable
+
+      - name: Build Windows x64
+        run: lazbuild --ws=win32 BonziClaude.lpi
+
+      - name: Upload Windows x64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: BonziClaude-windows-x64
+          path: BonziClaude.exe
+
+  build-windows-x86:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus (32-bit)
+        uses: gcarreno/setup-lazarus@v3
+        with:
+          lazarus-version: stable
+          architecture: i386
+
+      - name: Build Windows x86
+        run: lazbuild --ws=win32 BonziClaude.lpi
+
+      - name: Upload Windows x86 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: BonziClaude-windows-x86
+          path: BonziClaude.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus
+        uses: gcarreno/setup-lazarus@v3
+        with:
+          lazarus-version: stable
+
+      - name: Build macOS (Cocoa)
+        run: lazbuild --ws=cocoa BonziClaude.lpi
+
+      - name: Upload macOS binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: BonziClaude-macos
+          path: BonziClaude
