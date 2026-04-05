@@ -1093,7 +1093,7 @@ begin
     BtnCancel.Cancel := True;
 
     FChatting := True;
-    Memo.SetFocus;
+    ChatForm.ActiveControl := Memo;
 
     if ChatForm.ShowModal = mrOK then
     begin
