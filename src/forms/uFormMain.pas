@@ -1479,6 +1479,9 @@ var
   FreshCreds: TCredentials;
   NewToken: string;
 begin
+  // Silently drop responses while user is chatting
+  if FChatting then Exit;
+
   if AResult.HttpStatus = 401 then
   begin
     // 1. Try refreshing the token
