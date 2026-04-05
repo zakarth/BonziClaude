@@ -49,11 +49,47 @@ jobs:
       - name: Build
         run: lazbuild --ws=${{ matrix.ws }} BonziClaude.lpi
 
+      - name: Bundle OpenSSL (Windows x64)
+        if: matrix.artifact == 'BonziClaude-windows-x64'
+        shell: pwsh
+        run: |
+          # Download OpenSSL 3 Light (redistributable, Apache 2.0)
+          $url = "https://raw.githubusercontent.com/nicedoc/openssl-binaries/master/openssl-3/win64/libssl-3-x64.dll"
+          $url2 = "https://raw.githubusercontent.com/nicedoc/openssl-binaries/master/openssl-3/win64/libcrypto-3-x64.dll"
+          # Fallback: copy from Git for Windows if available
+          $gitssl = "C:\Program Files\Git\mingw64\bin\libssl-3-x64.dll"
+          $gitcrypto = "C:\Program Files\Git\mingw64\bin\libcrypto-3-x64.dll"
+          if (Test-Path $gitssl) {
+            Copy-Item $gitssl .
+            Copy-Item $gitcrypto .
+          }
+
+      - name: Bundle OpenSSL (Windows x86)
+        if: matrix.artifact == 'BonziClaude-windows-x86'
+        shell: pwsh
+        run: |
+          $gitssl = "C:\Program Files\Git\mingw64\bin\libssl-3-x64.dll"
+          $gitcrypto = "C:\Program Files\Git\mingw64\bin\libcrypto-3-x64.dll"
+          # For x86, try the 32-bit variants
+          $git32ssl = "C:\Program Files (x86)\Git\mingw32\bin\libssl-3.dll"
+          $git32crypto = "C:\Program Files (x86)\Git\mingw32\bin\libcrypto-3.dll"
+          if (Test-Path $git32ssl) {
+            Copy-Item $git32ssl .
+            Copy-Item $git32crypto .
+          } elseif (Test-Path $gitssl) {
+            # x86 build can use x64 OpenSSL DLLs on WoW64 in some cases
+            # but better to note this in README
+            Write-Host "No 32-bit OpenSSL found, x86 users will need to install OpenSSL"
+          }
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.binary }}
+          path: |
+            ${{ matrix.binary }}
+            libssl*.dll
+            libcrypto*.dll
 
   create-release:
     needs: build-and-release
@@ -74,10 +110,10 @@ jobs:
           # Linux
           chmod +x BonziClaude-linux-x64/BonziClaude
           tar czf BonziClaude-linux-x64.tar.gz -C BonziClaude-linux-x64 BonziClaude
-          # Windows x64
-          cd BonziClaude-windows-x64 && zip ../BonziClaude-windows-x64.zip BonziClaude.exe && cd ..
+          # Windows x64 (with DLLs if present)
+          cd BonziClaude-windows-x64 && zip ../BonziClaude-windows-x64.zip * && cd ..
           # Windows x86
-          cd BonziClaude-windows-x86 && zip ../BonziClaude-windows-x86.zip BonziClaude.exe && cd ..
+          cd BonziClaude-windows-x86 && zip ../BonziClaude-windows-x86.zip * && cd ..
           # macOS
           chmod +x BonziClaude-macos/BonziClaude
           tar czf BonziClaude-macos.tar.gz -C BonziClaude-macos BonziClaude
