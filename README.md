@@ -6,7 +6,9 @@ BonziClaude is a reverse-engineered reimplementation of Claude Code's `/buddy` f
 
 Think [BonziBuddy](https://en.wikipedia.org/wiki/BonziBuddy) (1999), but instead of adware, it's powered by Claude. And instead of a purple gorilla, you get one of 18 ASCII creatures with deterministic gacha mechanics.
 
-![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20x64%20%7C%20Windows%20x86-green)
+![BonziClaude Interface](bonziclaude-preview.png)
+
+![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20x64%20%7C%20Windows%20x86%20%7C%20macOS-green)
 ![Language](https://img.shields.io/badge/built%20with-Free%20Pascal%20%2F%20Lazarus-blue)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
