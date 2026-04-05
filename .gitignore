@@ -1,0 +1,31 @@
+# Lazarus build artifacts
+lib/
+*.o
+*.ppu
+*.compiled
+*.bak
+*.res
+backup/
+
+# Binaries
+BonziClaude
+BonziClaude.exe
+BuddyApp
+BuddyApp.exe
+
+# IDE files
+*.lps
+*.dbg
+
+# Config (user data)
+buddy_config.json
+credentials.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# SSL symlinks
+/tmp/bonziclaude-ssl/

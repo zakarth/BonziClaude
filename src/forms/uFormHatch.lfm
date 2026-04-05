@@ -1,0 +1,12 @@
+object FormHatch: TFormHatch
+  Left = 300
+  Height = 280
+  Top = 200
+  Width = 320
+  BorderStyle = bsSingle
+  Caption = 'Hatching...'
+  Color = clBlack
+  Position = poScreenCenter
+  OnCreate = FormCreate
+  OnPaint = FormPaint
+end
