@@ -40,8 +40,8 @@ type
     FChatting: Boolean;
     FChatForm: TForm;  // current chat input form (for key handler access)
 
-    FChatButton: TButton;
-    FPetButton: TButton;
+    FChatButton: TPanel;
+    FPetButton: TPanel;
 
     FClipTimer: TTimer;
     FLastClipText: string;
@@ -97,6 +97,9 @@ type
     procedure OnInitBubble(Sender: TObject);
     procedure OnChatClick(Sender: TObject);
     procedure OnChatKeyPress(Sender: TObject; var Key: Char);
+    procedure PaintChatBorder(Sender: TObject);
+    procedure PaintChatBtn(Sender: TObject);
+    procedure PaintPetBtn(Sender: TObject);
     procedure OnPetClick(Sender: TObject);
     procedure OnMenuConfig(Sender: TObject);
     procedure OnMenuReadFile(Sender: TObject);
@@ -354,27 +357,41 @@ var
 begin
   BtnW := (Width - MARGIN * 2 - 8) div 2;
 
-  // Chat button
-  FChatButton := TButton.Create(Self);
+  // Chat button — TPanel styled as themed button
+  FChatButton := TPanel.Create(Self);
   FChatButton.Parent := Self;
   FChatButton.Caption := #$F0#$9F#$92#$AC;  // 💬
   FChatButton.Width := BtnW;
   FChatButton.Height := INPUT_H;
-  FChatButton.Font.Size := 12;
+  FChatButton.Font.Name := FMonoFont.Name;
+  FChatButton.Font.Size := 11;
+  FChatButton.Font.Color := FThemeColor;
+  FChatButton.Color := FORM_BG;
+  FChatButton.BevelOuter := bvNone;
+  FChatButton.BorderStyle := bsNone;
+  FChatButton.Cursor := crHandPoint;
   FChatButton.OnClick := @OnChatClick;
-  FChatButton.Hint := 'Chat with ' + FConfig.Name;
+  FChatButton.OnPaint := @PaintChatBtn;
   FChatButton.ShowHint := True;
+  FChatButton.Hint := 'Chat with ' + FConfig.Name;
   FChatButton.Top := FInputY;
   FChatButton.Left := MARGIN;
 
-  // Pet button
-  FPetButton := TButton.Create(Self);
+  // Pet button — same style, heart color
+  FPetButton := TPanel.Create(Self);
   FPetButton.Parent := Self;
   FPetButton.Caption := #$E2#$99#$A5;  // ♥
   FPetButton.Width := BtnW;
   FPetButton.Height := INPUT_H;
-  FPetButton.Font.Size := 12;
+  FPetButton.Font.Name := FMonoFont.Name;
+  FPetButton.Font.Size := 11;
+  FPetButton.Font.Color := HEART_COLOR;
+  FPetButton.Color := FORM_BG;
+  FPetButton.BevelOuter := bvNone;
+  FPetButton.BorderStyle := bsNone;
+  FPetButton.Cursor := crHandPoint;
   FPetButton.OnClick := @OnPetClick;
+  FPetButton.OnPaint := @PaintPetBtn;
   FPetButton.Hint := 'Pet ' + FConfig.Name;
   FPetButton.ShowHint := True;
   FPetButton.Top := FInputY;
@@ -608,13 +625,11 @@ begin
   C.Font.Assign(FBubbleFont);
   TextH := C.TextHeight('Mg');
 
-  // Bubble box fills the form except the last line (connector)
-  ConnY := F.ClientHeight - FCharH;
-
+  // Bubble box fills the entire form — no connector, sits flush on buddy
   BubbleRect.Left := 0;
   BubbleRect.Top := 0;
   BubbleRect.Right := F.ClientWidth;
-  BubbleRect.Bottom := ConnY;
+  BubbleRect.Bottom := F.ClientHeight;
 
   C.Pen.Color := FThemeColor;
   C.Brush.Color := BUBBLE_BG;
@@ -625,23 +640,13 @@ begin
   begin
     C.Brush.Style := bsClear;
     C.Font.Color := FThemeColor;
-    Y := (ConnY - FBubbleLines.Count * TextH) div 2;
+    Y := (F.ClientHeight - FBubbleLines.Count * TextH) div 2;
     if Y < BUBBLE_PAD then Y := BUBBLE_PAD;
     for I := 0 to FBubbleLines.Count - 1 do
     begin
       C.TextOut(BUBBLE_PAD + 2, Y, FBubbleLines[I]);
       Inc(Y, TextH);
     end;
-  end;
-
-  // Connector flush at bottom
-  C.Font.Assign(FMonoFont);
-  C.Font.Color := FThemeColor;
-  C.Brush.Style := bsClear;
-  case FBubbleAnchor of
-    0: C.TextOut(F.ClientWidth - FCharW * 2, ConnY, '|');
-    1: C.TextOut(F.ClientWidth - FCharW, ConnY, '-');
-    2: C.TextOut(2, ConnY, '-');
   end;
 
   C.Brush.Style := bsSolid;
@@ -1032,6 +1037,61 @@ end;
 //  User interaction
 // ============================================================
 
+procedure TFormMain.PaintChatBtn(Sender: TObject);
+var
+  P: TPanel;
+  TxtW, TxtH: Integer;
+begin
+  P := TPanel(Sender);
+  P.Canvas.Brush.Color := FORM_BG;
+  P.Canvas.FillRect(P.ClientRect);
+  P.Canvas.Pen.Color := FThemeColor;
+  P.Canvas.Brush.Style := bsClear;
+  P.Canvas.Rectangle(0, 0, P.ClientWidth, P.ClientHeight);
+  P.Canvas.Font.Assign(P.Font);
+  P.Canvas.Font.Color := FThemeColor;
+  TxtW := P.Canvas.TextWidth(P.Caption);
+  TxtH := P.Canvas.TextHeight(P.Caption);
+  P.Canvas.TextOut((P.ClientWidth - TxtW) div 2, (P.ClientHeight - TxtH) div 2, P.Caption);
+  P.Canvas.Brush.Style := bsSolid;
+end;
+
+procedure TFormMain.PaintPetBtn(Sender: TObject);
+var
+  P: TPanel;
+  TxtW, TxtH: Integer;
+begin
+  P := TPanel(Sender);
+  P.Canvas.Brush.Color := FORM_BG;
+  P.Canvas.FillRect(P.ClientRect);
+  P.Canvas.Pen.Color := HEART_COLOR;
+  P.Canvas.Brush.Style := bsClear;
+  P.Canvas.Rectangle(0, 0, P.ClientWidth, P.ClientHeight);
+  P.Canvas.Font.Assign(P.Font);
+  P.Canvas.Font.Color := HEART_COLOR;
+  TxtW := P.Canvas.TextWidth(P.Caption);
+  TxtH := P.Canvas.TextHeight(P.Caption);
+  P.Canvas.TextOut((P.ClientWidth - TxtW) div 2, (P.ClientHeight - TxtH) div 2, P.Caption);
+  P.Canvas.Brush.Style := bsSolid;
+end;
+
+procedure TFormMain.PaintChatBorder(Sender: TObject);
+var
+  F: TForm;
+begin
+  if not (Sender is TForm) then Exit;
+  F := TForm(Sender);
+  // Black fill
+  F.Canvas.Brush.Color := FORM_BG;
+  F.Canvas.FillRect(F.ClientRect);
+  // Rarity-colored border (like speech bubble)
+  F.Canvas.Pen.Color := FThemeColor;
+  F.Canvas.Pen.Width := 1;
+  F.Canvas.Brush.Style := bsClear;
+  F.Canvas.Rectangle(0, 0, F.ClientWidth, F.ClientHeight);
+  F.Canvas.Brush.Style := bsSolid;
+end;
+
 procedure TFormMain.OnChatKeyPress(Sender: TObject; var Key: Char);
 begin
   if Key = #13 then
@@ -1048,11 +1108,18 @@ end;
 
 procedure TFormMain.OnChatClick(Sender: TObject);
 var
-  Edit: TEdit;
+  Memo: TMemo;
+  HintLabel: TLabel;
   InputText: string;
   Pt: TPoint;
 begin
-  // Hide the speech bubble while chatting
+  // Toggle: if chat is already open, close it
+  if FChatting and (FChatForm <> nil) then
+  begin
+    FChatForm.ModalResult := mrCancel;
+    Exit;
+  end;
+
   if (FBubbleForm <> nil) and FBubbleForm.Visible then
     FBubbleForm.Hide;
 
@@ -1060,37 +1127,56 @@ begin
   try
     FChatForm.BorderStyle := bsNone;
     FChatForm.FormStyle := fsStayOnTop;
-    FChatForm.Color := $00101010;
-    FChatForm.Height := 28;
+    FChatForm.Color := FORM_BG;
+    FChatForm.Width := Self.Width;
+    FChatForm.Height := 100;
     FChatForm.DoubleBuffered := True;
-    FChatForm.Width := Self.Width + 60;
 
-    // Position right above the companion
     Pt := ClientToScreen(Point(ClientWidth, 0));
     FChatForm.Left := Pt.X - FChatForm.Width;
     FChatForm.Top := Pt.Y - FChatForm.Height;
 
-    // Clean single-line edit — Enter sends, Escape closes
-    Edit := TEdit.Create(FChatForm);
-    Edit.Parent := FChatForm;
-    Edit.Align := alClient;
-    Edit.Font.Name := FBubbleFont.Name;
-    Edit.Font.Size := 11;
-    Edit.Font.Color := FThemeColor;
-    Edit.Color := $00101010;
-    Edit.BorderStyle := bsSingle;
-    Edit.TextHint := 'Enter to send, Esc to close';
-    Edit.OnKeyPress := @OnChatKeyPress;
+    // Themed border
+    FChatForm.OnPaint := @PaintChatBorder;
+
+    // Hint bar at bottom
+    HintLabel := TLabel.Create(FChatForm);
+    HintLabel.Parent := FChatForm;
+    HintLabel.Left := 6;
+    HintLabel.Top := FChatForm.Height - 16;
+    HintLabel.Width := FChatForm.Width - 12;
+    HintLabel.AutoSize := False;
+    HintLabel.Alignment := taCenter;
+    HintLabel.Caption := 'Enter: send  |  Esc: close';
+    HintLabel.Font.Name := FBubbleFont.Name;
+    HintLabel.Font.Size := 7;
+    HintLabel.Font.Color := DIM_COLOR;
+
+    // Memo with border margin
+    Memo := TMemo.Create(FChatForm);
+    Memo.Parent := FChatForm;
+    Memo.Left := 4;
+    Memo.Top := 4;
+    Memo.Width := FChatForm.Width - 8;
+    Memo.Height := FChatForm.Height - 24;
+    Memo.Font.Name := FBubbleFont.Name;
+    Memo.Font.Size := 10;
+    Memo.Font.Color := FThemeColor;
+    Memo.Color := FORM_BG;
+    Memo.ScrollBars := ssNone;
+    Memo.WordWrap := True;
+    Memo.BorderStyle := bsNone;
+    Memo.OnKeyPress := @OnChatKeyPress;
     {$IFDEF WINDOWS}
-    Edit.Font.Quality := fqClearType;
+    Memo.Font.Quality := fqClearType;
     {$ENDIF}
 
     FChatting := True;
-    FChatForm.ActiveControl := Edit;
+    FChatForm.ActiveControl := Memo;
 
     if FChatForm.ShowModal = mrOK then
     begin
-      InputText := Trim(Edit.Text);
+      InputText := Trim(Memo.Text);
       if InputText <> '' then
       begin
         if (LowerCase(InputText) = 'exit') or (LowerCase(InputText) = 'quit') then
@@ -1548,7 +1634,7 @@ begin
     FBubbleForm.Canvas.Font.Assign(FBubbleFont);
     TextH := FBubbleForm.Canvas.TextHeight('Mg');
     FBubbleForm.Width := Self.Width;
-    FBubbleForm.Height := 12 * TextH + BUBBLE_PAD * 2 + 4 + FCharH;
+    FBubbleForm.Height := 12 * TextH + BUBBLE_PAD * 2 + 4;  // no connector gap
   end;
 
   // Word-wrap text into the fixed bubble width
