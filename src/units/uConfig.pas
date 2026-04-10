@@ -32,6 +32,11 @@ type
     WindowX: Integer;
     WindowY: Integer;
 
+    // Session stats (stored locally, never sent externally as-is)
+    TotalSessions: Integer;
+    FirstLaunchDate: Integer;  // Trunc(Now) on first ever launch
+    TimesPetted: Integer;
+
     // Behavior
     ClipboardWatch: Boolean;
     IdleReactMinutes: Integer;
@@ -71,6 +76,9 @@ begin
   Result.OrgUuid := '';
   Result.WindowX := -1;
   Result.WindowY := -1;
+  Result.TotalSessions := 0;
+  Result.FirstLaunchDate := 0;
+  Result.TimesPetted := 0;
   Result.ClipboardWatch := True;
   Result.IdleReactMinutes := 5;
   Result.PrivacyMode := 1;  // standard by default
@@ -122,6 +130,9 @@ begin
           Result.OrgUuid := Obj.Get('orgUuid', Result.OrgUuid);
           Result.WindowX := Obj.Get('windowX', Result.WindowX);
           Result.WindowY := Obj.Get('windowY', Result.WindowY);
+          Result.TotalSessions := Obj.Get('totalSessions', Result.TotalSessions);
+          Result.FirstLaunchDate := Obj.Get('firstLaunchDate', Result.FirstLaunchDate);
+          Result.TimesPetted := Obj.Get('timesPetted', Result.TimesPetted);
           Result.ClipboardWatch := Obj.Get('clipboardWatch', Result.ClipboardWatch);
           Result.IdleReactMinutes := Obj.Get('idleReactMinutes', Result.IdleReactMinutes);
           Result.PrivacyMode := Obj.Get('privacyMode', Result.PrivacyMode);
@@ -171,6 +182,9 @@ begin
     Obj.Add('orgUuid', AConfig.OrgUuid);
     Obj.Add('windowX', AConfig.WindowX);
     Obj.Add('windowY', AConfig.WindowY);
+    Obj.Add('totalSessions', AConfig.TotalSessions);
+    Obj.Add('firstLaunchDate', AConfig.FirstLaunchDate);
+    Obj.Add('timesPetted', AConfig.TimesPetted);
     Obj.Add('clipboardWatch', AConfig.ClipboardWatch);
     Obj.Add('idleReactMinutes', AConfig.IdleReactMinutes);
     Obj.Add('privacyMode', AConfig.PrivacyMode);

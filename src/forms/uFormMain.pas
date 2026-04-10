@@ -32,6 +32,7 @@ type
     FBubbleText: string;
     FBubbleTimer: TTimer;
     FBubbleForm: TForm;  // separate popup for speech bubble
+    FBubbleReplyBtn: TPanel;
 
     FPetTimer: TTimer;
     FPetFrame: Integer;
@@ -46,6 +47,7 @@ type
     FClipTimer: TTimer;
     FLastClipText: string;
     FLastApiCall: TDateTime;
+    FLastUserInteraction: TDateTime;
 
     FIdleTimer: TTimer;
     FInitBubbleTimer: TTimer;
@@ -106,6 +108,7 @@ type
     procedure OnMenuAlwaysFront(Sender: TObject);
     procedure OnMenuBubbleAnchor(Sender: TObject);
     procedure OnMenuHistory(Sender: TObject);
+    procedure OnMenuClearHistory(Sender: TObject);
     procedure OnMenuMinimize(Sender: TObject);
     procedure OnMenuQuit(Sender: TObject);
     procedure OnFileDrop(Sender: TObject; const FileNames: array of string);
@@ -113,6 +116,8 @@ type
     procedure OnAmbientTimer(Sender: TObject);
     procedure PaintReadingAnim(ACanvas: TCanvas);
     function BuildAmbientContext: string;
+    function GetBatteryPercent: Integer;
+    function GetSystemLocale: string;
 
     procedure SendToApi(const ATranscript, AReason: string; AAddressed: Boolean);
     procedure OnApiResult(const AResult: TBuddyReactResult);
@@ -128,6 +133,7 @@ type
     procedure PaintCompanion(ACanvas: TCanvas);
     procedure PaintName(ACanvas: TCanvas);
     procedure PaintBubble(Sender: TObject);
+    procedure PaintBubbleReplyBtn(Sender: TObject);
     procedure PaintPetHearts(ACanvas: TCanvas);
     procedure PaintConnector(ACanvas: TCanvas);
 
@@ -142,6 +148,26 @@ implementation
 
 uses
   uOAuth, uFormConfig;
+
+{$IFDEF WINDOWS}
+type
+  TSystemPowerStatus = packed record
+    ACLineStatus: Byte;
+    BatteryFlag: Byte;
+    BatteryLifePercent: Byte;
+    SystemStatusFlag: Byte;
+    BatteryLifeTime: LongWord;
+    BatteryFullLifeTime: LongWord;
+  end;
+const
+  LOCALE_USER_DEFAULT     = $0400;
+  LOCALE_SISO639LANGNAME  = $0059;
+  LOCALE_SISO3166CTRYNAME = $005A;
+function GetSystemPowerStatus(var sps: TSystemPowerStatus): LongBool;
+  stdcall; external 'kernel32' name 'GetSystemPowerStatus';
+function GetLocaleInfoA(Locale, LCType: LongWord; lpData: PChar; cchData: Integer): Integer;
+  stdcall; external 'kernel32' name 'GetLocaleInfoA';
+{$ENDIF}
 
 {$R *.lfm}
 
@@ -216,6 +242,7 @@ begin
   except
   end;
   FLastApiCall := 0;
+  FLastUserInteraction := Now;
   FAlwaysFront := True;
   FBubbleAnchor := 0;  // 0=top (default)
   SetLength(FRecent, 0);
@@ -332,6 +359,12 @@ begin
     end;
   end;
 
+  // Session stats
+  Inc(FConfig.TotalSessions);
+  if FConfig.FirstLaunchDate = 0 then
+    FConfig.FirstLaunchDate := Trunc(Now);
+  SaveConfig(GetConfigPath, FConfig);
+
   FSpeciesIdx := GetSpeciesIndex(FConfig.Species);
   if FSpeciesIdx < 0 then
     FSpeciesIdx := 15;
@@ -418,6 +451,11 @@ begin
   MI := TMenuItem.Create(FPopup);
   MI.Caption := 'History';
   MI.OnClick := @OnMenuHistory;
+  FPopup.Items.Add(MI);
+
+  MI := TMenuItem.Create(FPopup);
+  MI.Caption := 'Clear History';
+  MI.OnClick := @OnMenuClearHistory;
   FPopup.Items.Add(MI);
 
   MI := TMenuItem.Create(FPopup);
@@ -829,6 +867,69 @@ begin
     SendToApi('User has been idle. Say something.', 'turn', False);
 end;
 
+function TFormMain.GetBatteryPercent: Integer;
+{$IFDEF WINDOWS}
+var
+  SPS: TSystemPowerStatus;
+begin
+  Result := -1;
+  if GetSystemPowerStatus(SPS) and (SPS.BatteryLifePercent <> 255) then
+    Result := SPS.BatteryLifePercent;
+end;
+{$ELSE}
+var
+  Paths: array[0..3] of string;
+  I: Integer;
+  F: TextFile;
+  S: string;
+begin
+  Result := -1;
+  Paths[0] := '/sys/class/power_supply/BAT0/capacity';
+  Paths[1] := '/sys/class/power_supply/BAT1/capacity';
+  Paths[2] := '/sys/class/power_supply/battery/capacity';
+  Paths[3] := '/sys/class/power_supply/CMB0/capacity';
+  for I := 0 to High(Paths) do
+    if FileExists(Paths[I]) then
+    begin
+      try
+        AssignFile(F, Paths[I]);
+        Reset(F);
+        ReadLn(F, S);
+        CloseFile(F);
+        Result := StrToIntDef(Trim(S), -1);
+        if Result >= 0 then Exit;
+      except
+      end;
+    end;
+end;
+{$ENDIF}
+
+function TFormMain.GetSystemLocale: string;
+{$IFDEF WINDOWS}
+var
+  Lang: array[0..8] of Char;
+  Ctry: array[0..8] of Char;
+begin
+  Result := '';
+  if GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SISO639LANGNAME, Lang, SizeOf(Lang)) > 0 then
+    Result := StrPas(Lang);
+  if GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SISO3166CTRYNAME, Ctry, SizeOf(Ctry)) > 0 then
+    Result := Result + '-' + StrPas(Ctry);
+end;
+{$ELSE}
+var
+  S: string;
+  P: Integer;
+begin
+  S := GetEnvironmentVariable('LANG');
+  if S = '' then S := GetEnvironmentVariable('LANGUAGE');
+  if S = '' then begin Result := ''; Exit; end;
+  P := Pos('.', S);
+  if P > 0 then S := Copy(S, 1, P - 1);
+  Result := StringReplace(S, '_', '-', []);
+end;
+{$ENDIF}
+
 function TFormMain.BuildAmbientContext: string;
 var
   Hour, Min, Sec, MS: Word;
@@ -839,6 +940,8 @@ var
   ProcOutput: string;
   Proc: TProcess;
   OutStream: TStringStream;
+  BatPct, DaysSince, IdleMins: Integer;
+  LocaleStr: string;
 begin
   DecodeTime(Time, Hour, Min, Sec, MS);
   DecodeDate(Date, Y, M, D);
@@ -886,6 +989,38 @@ begin
     Context := Context + 'It''s Friday! '
   else if (DayName = 'Saturday') or (DayName = 'Sunday') then
     Context := Context + 'User is working on the weekend. ';
+
+  // Standard+ (privacy>=1): battery, session stats, idle gap, locale
+  if FConfig.PrivacyMode >= 1 then
+  begin
+    BatPct := GetBatteryPercent;
+    if BatPct >= 0 then
+      Context := Context + Format('Battery: %d%%. ', [BatPct]);
+
+    DaysSince := Trunc(Now) - FConfig.FirstLaunchDate;
+    if FConfig.TotalSessions <= 1 then
+      Context := Context + 'First time launching BonziClaude. '
+    else
+      Context := Context + Format('Session #%d. ', [FConfig.TotalSessions]);
+    if DaysSince <= 0 then
+      Context := Context + 'First day using BonziClaude. '
+    else
+      Context := Context + Format('Known user for %d day%s. ',
+        [DaysSince + 1, IfThen(DaysSince = 0, '', 's')]);
+    if FConfig.TimesPetted > 0 then
+      Context := Context + Format('Petted %d time%s total. ',
+        [FConfig.TimesPetted, IfThen(FConfig.TimesPetted = 1, '', 's')]);
+
+    IdleMins := Round((Now - FLastUserInteraction) * 24 * 60);
+    if IdleMins >= 60 then
+      Context := Context + Format('Idle: %dh %dm. ', [IdleMins div 60, IdleMins mod 60])
+    else if IdleMins >= 5 then
+      Context := Context + Format('Idle: %dm. ', [IdleMins]);
+
+    LocaleStr := GetSystemLocale;
+    if LocaleStr <> '' then
+      Context := Context + Format('Locale: %s. ', [LocaleStr]);
+  end;
 
   // Personalized mode (privacy=2): include system details
   if FConfig.PrivacyMode >= 2 then
@@ -1075,6 +1210,25 @@ begin
   P.Canvas.Brush.Style := bsSolid;
 end;
 
+procedure TFormMain.PaintBubbleReplyBtn(Sender: TObject);
+var
+  P: TPanel;
+  TxtW, TxtH: Integer;
+begin
+  P := TPanel(Sender);
+  P.Canvas.Brush.Color := FORM_BG;
+  P.Canvas.FillRect(P.ClientRect);
+  P.Canvas.Pen.Color := FThemeColor;
+  P.Canvas.Brush.Style := bsClear;
+  P.Canvas.Rectangle(0, 0, P.ClientWidth, P.ClientHeight);
+  P.Canvas.Font.Assign(P.Font);
+  P.Canvas.Font.Color := FThemeColor;
+  TxtW := P.Canvas.TextWidth(P.Caption);
+  TxtH := P.Canvas.TextHeight(P.Caption);
+  P.Canvas.TextOut((P.ClientWidth - TxtW) div 2, (P.ClientHeight - TxtH) div 2, P.Caption);
+  P.Canvas.Brush.Style := bsSolid;
+end;
+
 procedure TFormMain.PaintChatBorder(Sender: TObject);
 var
   F: TForm;
@@ -1195,6 +1349,7 @@ begin
           OnMenuConfig(nil);
           Exit;
         end;
+        FLastUserInteraction := Now;
         SendToApi(InputText, 'turn', True);
       end;
     end;
@@ -1207,6 +1362,8 @@ end;
 
 procedure TFormMain.OnPetClick(Sender: TObject);
 begin
+  Inc(FConfig.TimesPetted);
+  FLastUserInteraction := Now;
   FIsPetting := True;
   FPetFrame := 0;
   FPetTimer.Enabled := True;
@@ -1296,6 +1453,7 @@ begin
     FPetTimer.Enabled := True;
     Invalidate;
 
+    FLastUserInteraction := Now;
     ShowBubble('Reading ' + ExtractFileName(FileNames[0]) + '...');
     Application.ProcessMessages;
     SendToApi('File "' + ExtractFileName(FileNames[0]) + '" (' +
@@ -1365,6 +1523,16 @@ begin
   finally
     Dlg.Free;
   end;
+end;
+
+procedure TFormMain.OnMenuClearHistory(Sender: TObject);
+begin
+  if MessageDlg('Clear History', 'Clear all conversation history and context?',
+      mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+  FHistory.Clear;
+  FChatLog.Clear;
+  SetLength(FRecent, 0);
 end;
 
 procedure TFormMain.OnMenuAlwaysFront(Sender: TObject);
@@ -1635,6 +1803,26 @@ begin
     TextH := FBubbleForm.Canvas.TextHeight('Mg');
     FBubbleForm.Width := Self.Width;
     FBubbleForm.Height := 12 * TextH + BUBBLE_PAD * 2 + 4;  // no connector gap
+
+    // Reply button — bottom-right corner of the bubble
+    FBubbleReplyBtn := TPanel.Create(FBubbleForm);
+    FBubbleReplyBtn.Parent := FBubbleForm;
+    FBubbleReplyBtn.Caption := #$E2#$86#$A9;  // ↩
+    FBubbleReplyBtn.Width := 40;
+    FBubbleReplyBtn.Height := 20;
+    FBubbleReplyBtn.Font.Name := FMonoFont.Name;
+    FBubbleReplyBtn.Font.Size := 10;
+    FBubbleReplyBtn.Font.Color := FThemeColor;
+    FBubbleReplyBtn.Color := FORM_BG;
+    FBubbleReplyBtn.BevelOuter := bvNone;
+    FBubbleReplyBtn.BorderStyle := bsNone;
+    FBubbleReplyBtn.Cursor := crHandPoint;
+    FBubbleReplyBtn.ShowHint := True;
+    FBubbleReplyBtn.Hint := 'Reply to ' + FConfig.Name;
+    FBubbleReplyBtn.OnPaint := @PaintBubbleReplyBtn;
+    FBubbleReplyBtn.OnClick := @OnChatClick;
+    FBubbleReplyBtn.Left := FBubbleForm.Width - FBubbleReplyBtn.Width - 3;
+    FBubbleReplyBtn.Top := FBubbleForm.Height - FBubbleReplyBtn.Height - 3;
   end;
 
   // Word-wrap text into the fixed bubble width

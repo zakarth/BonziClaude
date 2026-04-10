@@ -1,16 +1,19 @@
 # BonziClaude
 
-**A cross-platform desktop companion powered by Claude Code's hidden buddy_react API endpoint.**
+> **The buddy_react API endpoint has been killed by Anthropic as of ~April 2026.** The endpoint still accepts requests and returns HTTP 200, but every response is `{"reaction":""}` -- an empty string. Server-side response times (~86ms) confirm no model inference is occurring. The `/buddy` command has also been removed from Claude Code itself. BonziClaude still builds and runs, but all API interactions will return "(no response)". The documentation below is preserved as a historical reference for the buddy system as it existed from April 1st through early April 2026.
 
-BonziClaude is a reverse-engineered reimplementation of Claude Code's `/buddy` feature as a standalone desktop application. It uses an undocumented free inference endpoint on Anthropic's API to power an ASCII art companion that lives on your desktop, reacts to your activity, and occasionally offers sarcastic commentary on your life choices.
+**A cross-platform desktop companion powered by Claude Code's (now-defunct) hidden buddy_react API endpoint.**
 
-Think [BonziBuddy](https://en.wikipedia.org/wiki/BonziBuddy) (1999), but instead of adware, it's powered by Claude. And instead of a purple gorilla, you get one of 18 ASCII creatures with deterministic gacha mechanics.
+BonziClaude was a reverse-engineered reimplementation of Claude Code's `/buddy` feature as a standalone desktop application. It used an undocumented free inference endpoint on Anthropic's API to power an ASCII art companion that lived on your desktop, reacted to your activity, and occasionally offered sarcastic commentary on your life choices.
+
+Think [BonziBuddy](https://en.wikipedia.org/wiki/BonziBuddy) (1999), but instead of adware, it was powered by Claude. And instead of a purple gorilla, you got one of 18 ASCII creatures with deterministic gacha mechanics.
 
 ![BonziClaude Interface](bonziclaude-preview.png)
 
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20x64%20%7C%20Windows%20x86%20%7C%20macOS-green)
 ![Language](https://img.shields.io/badge/built%20with-Free%20Pascal%20%2F%20Lazarus-blue)
 ![License](https://img.shields.io/badge/license-MIT-orange)
+![Status](https://img.shields.io/badge/API%20status-DEAD-red)
 
 ---
 
@@ -45,9 +48,9 @@ Buddy includes the following:
 This project started as a reverse engineering exercise to understand how the system works, and evolved into a full standalone desktop application.
 
 ## BLUF
-BonziClaude utilizes the buddy API endpoints to decouple the buddy from Claude Code and instead let you run it right in your desktop. You can change every feature of it, but notably, you can also change the way it responds and performs activities. Because the endpoint (for now) is unmetered, you get free Sonnet 3.5 access for a personal character and you can customize its behavior. This only includes about 100 output tokens, but that's enough for some small tasks.  
+~~BonziClaude utilizes the buddy API endpoints to decouple the buddy from Claude Code and instead let you run it right in your desktop. You can change every feature of it, but notably, you can also change the way it responds and performs activities. Because the endpoint (for now) is unmetered, you get free Sonnet 3.5 access for a personal character and you can customize its behavior. This only includes about 100 output tokens, but that's enough for some small tasks.~~
 
-To maintain access, BonziClaude will attempt to use your Claude Code login if active, or allow you to give it its own oAuth token by logging in yourself. 
+**Update: The buddy_react endpoint is dead.** Anthropic has silently disabled the server-side model backing it. The endpoint returns empty reactions for all requests. The `/buddy` feature has also been removed from the Claude Code client. BonziClaude is now a desktop companion with no voice. The rest of this README documents the system as it was.
 
 ## Desktop Behavior
 There have been some notable changes to the desktop behavior vs Claude Code 
@@ -58,7 +61,7 @@ There have been some notable changes to the desktop behavior vs Claude Code
 - You can customize, re-hatch, or change any aspect of how the buddy interacts with Anthropic
 - Maintains a small chat history 
 
-### The Endpoint
+### The Endpoint (Defunct)
 
 The key discovery was the `buddy_react` API endpoint:
 
@@ -66,14 +69,16 @@ The key discovery was the `buddy_react` API endpoint:
 POST https://api.anthropic.com/api/organizations/{orgUuid}/claude_code/buddy_react
 ```
 
+> **This endpoint no longer functions.** As of ~April 10, 2026, it returns `{"reaction":""}` for all requests. The information below describes its behavior when it was active.
+
 This endpoint:
-- **Runs Claude 3.5 Sonnet** -- see [Model Identification](#model-identification) below
-- Accepts a companion's personality as a system prompt
-- Takes up to 5KB of transcript context
-- Returns a ~350 character reaction
-- Is authenticated via OAuth bearer token (same as Claude Code sessions)
-- Has **no visible token metering** -- reactions don't count against usage quotas
-- Is separate from the `/v1/messages` API
+- **Ran Claude 3.5 Sonnet** -- see [Model Identification](#model-identification) below
+- Accepted a companion's personality as a system prompt
+- Took up to 5KB of transcript context
+- Returned a ~350 character reaction
+- Was authenticated via OAuth bearer token (same as Claude Code sessions)
+- Had **no visible token metering** -- reactions didn't count against usage quotas
+- Was separate from the `/v1/messages` API
 
 ### Server-Enforced Limits
 
@@ -521,9 +526,9 @@ This document is thorough enough to fully reimplement the Claude Code buddy syst
 
 ## Disclaimer
 
-BonziClaude is an independent project created through reverse engineering of publicly available binaries. It is not affiliated with, endorsed by, or supported by Anthropic. The buddy_react API endpoint is undocumented and may change or be removed at any time. Use at your own risk.
+BonziClaude is an independent project created through reverse engineering of publicly available binaries. It is not affiliated with, endorsed by, or supported by Anthropic. The buddy_react API endpoint was undocumented and has since been disabled by Anthropic.
 
-Unlike its namesake, BonziClaude contains no adware, spyware, or malware. It's just a rabbit. On your desktop. Judging your code.
+Unlike its namesake, BonziClaude contains no adware, spyware, or malware. It's just a rabbit. On your desktop. Silently judging your code. In silence now, forever.
 
 ---
 
